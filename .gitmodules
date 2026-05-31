@@ -118,3 +118,15 @@
 [submodule "src/modules/simulation/gz_plugins/optical_flow/PX4-OpticalFlow"]
 	path = src/modules/simulation/gz_plugins/optical_flow/PX4-OpticalFlow
 	url = https://github.com/PX4/PX4-OpticalFlow.git
+[submodule "src/drivers/dronecan/libcanard"]
+	path = src/drivers/dronecan/libcanard
+	url = https://github.com/DroneCAN/libcanard
+[submodule "src/drivers/dronecan/dronecan_dsdlc"]
+	path = src/drivers/dronecan/dronecan_dsdlc
+	url = https://github.com/DroneCAN/dronecan_dsdlc
+[submodule "src/drivers/dronecan/DSDL"]
+	path = src/drivers/dronecan/DSDL
+	url = https://github.com/DroneCAN/DSDL
+[submodule "src/drivers/dronecan/pydronecan"]
+	path = src/drivers/dronecan/pydronecan
+	url = https://github.com/DroneCAN/pydronecan
