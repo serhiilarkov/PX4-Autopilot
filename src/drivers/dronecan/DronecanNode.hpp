@@ -45,16 +45,17 @@
 /**
  * DroneCAN (UAVCANv0 / libcanard) node.
  *
- * P4.0 scaffold: a singleton ScheduledWorkItem on wq:uavcan with a
+ * P4.0/P4.1 scaffold: a singleton ScheduledWorkItem on wq:uavcan with a
  * start/stop/status CLI and the DC_* parameters. The transport (DronecanHandle),
- * the codec shim (DroneCANCodec), the dispatch router and the sensor/actuator
- * bridges land in P4.1 and later -- see dronecan_migration/DESIGN.md.
+ * the codec shim (DroneCANCodec) and the dispatch router exist (P4.1); the node
+ * wires them on first Run() and the sensor/actuator bridges follow, starting in
+ * P4.3 -- see dronecan_migration/DESIGN.md.
  */
 class DronecanNode : public ModuleParams, public px4::ScheduledWorkItem
 {
 	/*
 	 * Base interval; will be complemented by a CAN-RX-IRQ ScheduleNow() once the
-	 * transport lands (P4.1), to decrease response time.
+	 * node wires the transport (P4.3), to decrease response time.
 	 */
 	static constexpr unsigned ScheduleIntervalMs = 3;
 

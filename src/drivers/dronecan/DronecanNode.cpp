@@ -47,8 +47,9 @@ DronecanNode *DronecanNode::_instance;
 namespace
 {
 // P4.0 link-proof trampolines: minimal callbacks matching the libcanard v0
-// signatures so canardInit() can be exercised below. Replaced by
-// DronecanHandle's real shouldAccept/onReception trampolines in P4.1.
+// signatures so canardInit() can be exercised below. The real
+// DronecanHandle (P4.1) carries its own shouldAccept/onReception trampolines;
+// the node adopts the handle and drops this placeholder in P4.3.
 bool dc_should_accept(const CanardInstance *ins, uint64_t *out_sig, uint16_t dtid,
 		      CanardTransferType transfer_type, uint8_t source_node_id)
 {
@@ -118,8 +119,8 @@ void DronecanNode::Run()
 	perf_count(_interval_perf);
 	perf_begin(_cycle_perf);
 
-	// P4.1+: lazy CAN bring-up, then transmit(); receive(); transmit(); under the
-	// node mutex. The P4.0 scaffold has no transport yet.
+	// P4.3: lazy CAN bring-up, then transmit(); receive(); transmit(); under the
+	// node mutex, driving the DronecanHandle. The P4.0 scaffold has no transport yet.
 
 	if (_parameter_update_sub.updated()) {
 		parameter_update_s pupdate;
@@ -139,7 +140,7 @@ void DronecanNode::print_info()
 	PX4_INFO("DroneCAN node id %" PRIu32 ", bitrate %" PRIu32, _node_id, _bitrate);
 
 	// P4.0 link-proof: exercise libcanard so canard.c is genuinely linked, not just
-	// compiled. Replaced by DronecanHandle ownership of the CanardInstance in P4.1.
+	// compiled. Replaced by DronecanHandle ownership of the CanardInstance in P4.3.
 	static uint8_t pool[CANARD_MEM_BLOCK_SIZE * 4];
 	CanardInstance ins{};
 	canardInit(&ins, pool, sizeof(pool), &dc_on_reception, &dc_should_accept, nullptr);
