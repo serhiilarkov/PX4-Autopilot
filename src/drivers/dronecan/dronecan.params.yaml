@@ -1,0 +1,43 @@
+module_name: dronecan
+parameters:
+- group: DroneCAN
+  definitions:
+    DC_ENABLE:
+      description:
+        short: DroneCAN mode
+        long: |-
+          0 - DroneCAN disabled.
+          1 - Enables support for DroneCAN sensors without dynamic node ID allocation and firmware update.
+          2 - Enables support for DroneCAN sensors with dynamic node ID allocation and firmware update.
+          3 - Enables support for DroneCAN sensors and actuators with dynamic node ID allocation and firmware update. Also sets the motor control outputs to DroneCAN.
+      type: enum
+      values:
+        0: Disabled
+        1: Sensors Manual Config
+        2: Sensors Automatic Config
+        3: Sensors and Actuators (ESCs) Automatic Config
+      default: 0
+      min: 0
+      max: 3
+      reboot_required: true
+    DC_NODE_ID:
+      description:
+        short: DroneCAN Node ID
+        long: |-
+          Static node ID of this node on the bus. PX4 acts as the DroneCAN server
+          (not a dynamic-allocation client), so this must be a valid unicast ID.
+          Read the specs at https://dronecan.github.io/ to learn more about Node ID.
+      type: int32
+      default: 1
+      min: 1
+      max: 125
+      reboot_required: true
+    DC_BITRATE:
+      description:
+        short: DroneCAN CAN bus bitrate
+      type: int32
+      default: 1000000
+      unit: bit/s
+      min: 20000
+      max: 1000000
+      reboot_required: true

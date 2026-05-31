@@ -5,8 +5,12 @@
 menuconfig DRIVERS_CYPHAL
 	bool "Cyphal"
 	default n
+	depends on !DRIVERS_DRONECAN
 	---help---
 		Enable support for Cyphal
+
+		Mutually exclusive with the libcanard-based "dronecan" driver: both vendor a
+		libcanard generation with colliding canard* symbols. dronecan wins.
 
 if DRIVERS_CYPHAL
     choice

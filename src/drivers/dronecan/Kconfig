@@ -1,0 +1,14 @@
+menuconfig DRIVERS_DRONECAN
+	bool "dronecan"
+	default n
+	depends on PLATFORM_NUTTX
+	---help---
+		Enable support for the libcanard-based DroneCAN (UAVCANv0) driver.
+
+		Mutually exclusive with the legacy "uavcan" (libuavcan) driver and the
+		"Cyphal" driver: all three vendor a libcanard generation and export
+		colliding canard* symbols, so only one may be built at a time. dronecan
+		wins -- enabling it forces the other two off.
+
+if DRIVERS_DRONECAN
+endif #DRIVERS_DRONECAN
