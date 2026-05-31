@@ -536,15 +536,30 @@ else
 	fi
 
 	#
-	# Optional UAVCAN/DroneCAN or Cyphal
+	# Optional DroneCAN (libcanard), legacy UAVCAN (libuavcan), or Cyphal.
 	#
-	if param greater -s UAVCAN_ENABLE 0
+	# DC_* params exist only when the dronecan module is built in. Migrate any legacy
+	# UAVCAN_* settings into DC_* (idempotent) before the start gate, so a board
+	# reflashed from uavcan inherits its enable/node id on first boot. DC_BITRATE is
+	# always >0 when present, so it gates the migrate call to dronecan boards.
+	#
+	if param greater -s DC_BITRATE 0
 	then
-		uavcan start
+		dronecan migrate
+	fi
+
+	if param greater -s DC_ENABLE 0
+	then
+		dronecan start
 	else
-		if param greater -s CYPHAL_ENABLE 0
+		if param greater -s UAVCAN_ENABLE 0
 		then
-			cyphal start
+			uavcan start
+		else
+			if param greater -s CYPHAL_ENABLE 0
+			then
+				cyphal start
+			fi
 		fi
 	fi
 

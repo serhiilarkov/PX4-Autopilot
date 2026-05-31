@@ -33,29 +33,44 @@
 
 #pragma once
 
+#include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/defines.h>
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 
+#include <drivers/drv_hrt.h>
 #include <lib/perf/perf_counter.h>
 #include <uORB/Subscription.hpp>
 #include <uORB/topics/parameter_update.h>
 
+#include "DronecanHandle.hpp"
+#include "DronecanRxRouter.hpp"
+
+#if defined(DRONECAN_FDCAN_DRIVER)
+# include "CanardFdcanIface.hpp"
+#elif defined(CONFIG_NET_CAN)
+# include "CanardSocketCAN.hpp"
+#elif defined(CONFIG_CAN_EXTID)
+# include "CanardNuttXCDev.hpp"
+#endif
+
 /**
  * DroneCAN (UAVCANv0 / libcanard) node.
  *
- * P4.0/P4.1 scaffold: a singleton ScheduledWorkItem on wq:uavcan with a
- * start/stop/status CLI and the DC_* parameters. The transport (DronecanHandle),
- * the codec shim (DroneCANCodec) and the dispatch router exist (P4.1); the node
- * wires them on first Run() and the sensor/actuator bridges follow, starting in
- * P4.3 -- see dronecan_migration/DESIGN.md.
+ * Singleton ScheduledWorkItem on wq:uavcan. Owns the platform-free transport
+ * (DronecanHandle + DronecanRxRouter) and the concrete CAN media backend, wrapping
+ * them in the PX4 glue (perf, hrt, logging, params). The CAN bring-up is lazy --
+ * done on the first Run() on the WQ thread, never in the ctor -- and the node
+ * pumps transmit/receive/transmit under _node_mutex each tick. See
+ * dronecan_migration/DESIGN.md §6/§8.
  */
 class DronecanNode : public ModuleParams, public px4::ScheduledWorkItem
 {
 	/*
-	 * Base interval; will be complemented by a CAN-RX-IRQ ScheduleNow() once the
-	 * node wires the transport (P4.3), to decrease response time.
+	 * Base tick. Bounds TX latency, periodic node messages and stale-transfer
+	 * cleanup; complemented by a CAN-RX-IRQ ScheduleNow() once a media backend can
+	 * signal RX readiness (busevent_signal_trampoline).
 	 */
 	static constexpr unsigned ScheduleIntervalMs = 3;
 
@@ -67,17 +82,55 @@ public:
 
 	static DronecanNode *instance() { return _instance; }
 
+	/// One-time, idempotent UAVCAN_* -> DC_* parameter migration. Static so the rcS
+	/// board-init hook can run it before the DC_ENABLE start gate is evaluated (the
+	/// cutover chicken-and-egg fix, DESIGN §7).
+	static void migrateLegacyParams();
+
 	void print_info();
 
 private:
 	void Run() override;
 
+	/// Lazy bring-up on the WQ thread: open the CAN media, canardInit over the pool,
+	/// assign the validated node id. Retried each Run() until the media is ready.
+	bool init();
+
+	/// CAN-RX-IRQ trampoline: only wakes the work queue (IRQ context, no canard
+	/// access). The seam for the dual-scheduling model in DESIGN §6.
+	static void busevent_signal_trampoline();
+
+	/// Publish uavcan.protocol.NodeStatus at 1 Hz -- the first real publisher through
+	/// the codec shim.
+	void sendNodeStatus();
+
 	static DronecanNode *_instance;
 
 	uint32_t _node_id{0};
 	uint32_t _bitrate{0};
+	bool _initialized{false};
 
 	pthread_mutex_t _node_mutex;
+
+	// Transport stack. Declaration order matters: _handle holds references to
+	// _rx_router and _can_iface, so they must be constructed first.
+	DronecanRxRouter _rx_router;
+#if defined(DRONECAN_FDCAN_DRIVER)
+	CanardFdcanIface _can_iface;
+#elif defined(CONFIG_NET_CAN)
+	CanardSocketCAN _can_iface;
+#elif defined(CONFIG_CAN_EXTID)
+	CanardNuttXCDev _can_iface;
+#else
+	NullCanardInterface _can_iface;
+#endif
+	DronecanHandle _handle {_can_iface, _rx_router};
+
+	// NodeStatus @ 1 Hz.
+	hrt_abstime _boot_time{0};
+	hrt_abstime _nodestatus_last{0};
+	uint8_t _nodestatus_buf[7] {};   // sized to UAVCAN_PROTOCOL_NODESTATUS_MAX_SIZE (asserted in .cpp)
+	uint8_t _nodestatus_transfer_id{0};
 
 	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 

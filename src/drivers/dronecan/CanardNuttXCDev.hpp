@@ -33,70 +33,37 @@
 
 #pragma once
 
+#include <px4_platform_common/px4_config.h>
+
 #include <canard.h>
 
-/**
- * One received CAN frame plus the timestamp libcanard needs to build RX state.
- *
- * The legacy v0 frame type is CanardCANFrame (29-bit id + up to 8 data bytes),
- * not the modern Cyphal CanardFrame. This is the v0 re-typing of cyphal's
- * CanardRxFrame.
- */
-struct DronecanRxFrame {
-	uint64_t timestamp_usec;
-	CanardCANFrame frame;
-};
+#include "CanardInterface.hpp"
 
 /**
- * Media abstraction for the legacy DroneCAN-v0 transport. Concrete backends:
- *  - CanardNuttXCDev   (CONFIG_CAN_EXTID, NuttX CAN char device)  [P4.3]
- *  - CanardSocketCAN   (CONFIG_NET_CAN, SocketCAN)                [P4.3]
- *  - NullCanardInterface (no NuttX CAN backend configured)
- *  - FakeCanardInterface (test/, off-target loopback)
- *
- * DronecanHandle is constructor-injected with one of these so the whole stack
- * is drivable off-target.
+ * NuttX upper-half CAN char-device media backend (CONFIG_CAN_EXTID, e.g. the
+ * bxCAN /dev/can0 path). Ported from the cyphal CanardNuttXCDev, re-typed to the
+ * legacy v0 CanardCANFrame: the frame carries an inline data[8] array (not a
+ * repointed pointer), and the 29-bit id is masked on TX / OR'd with the EFF flag
+ * on RX so libcanard accepts it.
  */
-class CanardInterface
+class CanardNuttXCDev : public CanardInterface
 {
 public:
-	CanardInterface() = default;
-	virtual ~CanardInterface() = default;
+	CanardNuttXCDev() = default;
+	~CanardNuttXCDev() override = default;
 
-	virtual int init() { return 0; }
+	/// Bring up the STM32 CAN device and open /dev/can0 non-blocking.
+	/// Returns 0 on success, -1 on error.
+	int init() override;
 
-	virtual int close() { return 0; }
-
-	/// Transmit one frame. Returns >0 when the frame was accepted by the media,
-	/// 0 when the media is not ready (try again later), <0 on error.
-	virtual int16_t transmit(const CanardCANFrame &frame, int timeout_ms = 0) = 0;
+	/// Transmit one frame. Returns 1 when the frame was written, 0 when the media
+	/// is not ready (try again later), <0 on error.
+	int16_t transmit(const CanardCANFrame &frame, int timeout_ms = 0) override;
 
 	/// Receive one frame into rxf. Returns >0 when a frame was read, 0 when none
 	/// is available, <0 on error.
-	virtual int16_t receive(DronecanRxFrame *rxf) = 0;
-};
+	int16_t receive(DronecanRxFrame *rxf) override;
 
-/**
- * Null-object media for boards that do not (yet) configure a NuttX CAN backend.
- * Lets the node link and run inertly: init() fails so lazy bring-up keeps retrying
- * harmlessly, and TX/RX never move a frame. Replaced the moment a board enables
- * CONFIG_NET_CAN or CONFIG_CAN_EXTID.
- */
-class NullCanardInterface : public CanardInterface
-{
-public:
-	int init() override { return -1; }
-
-	int16_t transmit(const CanardCANFrame &frame, int timeout_ms = 0) override
-	{
-		(void)frame;
-		(void)timeout_ms;
-		return -1;
-	}
-
-	int16_t receive(DronecanRxFrame *rxf) override
-	{
-		(void)rxf;
-		return 0;
-	}
+private:
+	int _fd{-1};
 };

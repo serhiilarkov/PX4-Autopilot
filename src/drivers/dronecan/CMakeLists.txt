@@ -83,6 +83,53 @@ endif()
 
 file(GLOB DRONECAN_GENERATED_SRCS ${DRONECAN_DSDLC_OUTPUT}/src/*.c)
 
+# Media backend selection. Preferred: the shared, framework-neutral STM32H7 FDCAN
+# driver extracted into the platform layer (platforms/nuttx/.../stm32h7/can, written
+# against the px4can shim -- no libuavcan dependency). Because dronecan and the legacy
+# uavcan module are mutually exclusive at link time, each can compile the shared driver
+# sources directly with no symbol conflict. The native-NuttX SocketCAN / CAN char-device
+# backends are kept as future stubs; a board with neither falls back to the header-only
+# NullCanardInterface in the node.
+set(DRONECAN_MEDIA_SRCS)
+set(DRONECAN_MEDIA_INCLUDES)
+set(DRONECAN_MEDIA_FLAGS)
+
+set(PX4_STM32H7_CAN_DIR ${PX4_SOURCE_DIR}/platforms/nuttx/src/px4/stm/stm32h7/can)
+
+if(${PX4_PLATFORM} MATCHES "nuttx" AND "${CONFIG_ARCH_CHIP}" MATCHES "stm32h7" AND NOT CONFIG_NET_CAN)
+	list(APPEND DRONECAN_MEDIA_SRCS
+		CanardFdcanIface.cpp
+		CanardFdcanIface.hpp
+		${PX4_STM32H7_CAN_DIR}/uc_stm32h7_can.cpp
+		${PX4_STM32H7_CAN_DIR}/uc_stm32h7_clock.cpp
+		${PX4_STM32H7_CAN_DIR}/uc_stm32h7_thread.cpp
+	)
+	list(APPEND DRONECAN_MEDIA_INCLUDES
+		${PX4_STM32H7_CAN_DIR}/include
+	)
+	list(APPEND DRONECAN_MEDIA_FLAGS
+		-DDRONECAN_FDCAN_DRIVER=1
+	)
+	# The extracted libuavcan-derived register driver predates PX4's C++ warning set.
+	set_source_files_properties(
+		${PX4_STM32H7_CAN_DIR}/uc_stm32h7_can.cpp
+		${PX4_STM32H7_CAN_DIR}/uc_stm32h7_clock.cpp
+		${PX4_STM32H7_CAN_DIR}/uc_stm32h7_thread.cpp
+		CanardFdcanIface.cpp
+		PROPERTIES COMPILE_FLAGS "-Wno-cast-align -Wno-deprecated-copy -Wno-address-of-packed-member"
+	)
+elseif(${PX4_PLATFORM} MATCHES "nuttx" AND CONFIG_NET_CAN)
+	list(APPEND DRONECAN_MEDIA_SRCS
+		CanardSocketCAN.cpp
+		CanardSocketCAN.hpp
+	)
+elseif(${PX4_PLATFORM} MATCHES "nuttx" AND CONFIG_CAN_EXTID)
+	list(APPEND DRONECAN_MEDIA_SRCS
+		CanardNuttXCDev.cpp
+		CanardNuttXCDev.hpp
+	)
+endif()
+
 # Legacy libcanard + ArduPilot-generated C are not written for PX4's -Werror.
 remove_definitions(-Werror)
 
@@ -98,9 +145,11 @@ px4_add_module(
 		-DCANARD_ENABLE_CANFD=0
 		-DCANARD_ENABLE_DEADLINE=1
 		-DCANARD_ALLOCATE_SEM=0
+		${DRONECAN_MEDIA_FLAGS}
 	INCLUDES
 		${DRONECAN_LIBCANARD_DIR}
 		${DRONECAN_DSDLC_OUTPUT}/include
+		${DRONECAN_MEDIA_INCLUDES}
 	SRCS
 		DronecanNode.cpp
 		DronecanNode.hpp
@@ -112,6 +161,7 @@ px4_add_module(
 		DronecanHandle.cpp
 		DronecanHandle.hpp
 		RxSubscriberBase.hpp
+		${DRONECAN_MEDIA_SRCS}
 		${DRONECAN_LIBCANARD_DIR}/canard.c
 		${DRONECAN_LIBCANARD_DIR}/canard.h
 		${DRONECAN_GENERATED_SRCS}

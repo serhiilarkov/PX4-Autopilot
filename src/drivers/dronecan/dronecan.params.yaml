@@ -41,3 +41,26 @@ parameters:
       min: 20000
       max: 1000000
       reboot_required: true
+    DC_POOL:
+      description:
+        short: DroneCAN memory pool size
+        long: |-
+          Bytes of the libcanard block pool handed to the node at start. RX
+          reassembly and TX enqueue share this pool; raise it on busy/high-node-count
+          buses if 'dronecan status' shows the peak block usage approaching capacity.
+          Bounded by the static pool ceiling (DC_POOL_MAX, a build constant).
+      type: int32
+      default: 8192
+      min: 2048
+      max: 16384
+      reboot_required: true
+    DC_MIGRATED:
+      description:
+        short: DroneCAN param migration sentinel
+        long: |-
+          Internal. Set to 1 once the one-time UAVCAN_* -> DC_* parameter migration
+          has run; keeps the migration idempotent across reboots. Not user-facing.
+      type: int32
+      default: 0
+      min: 0
+      max: 1

@@ -52,10 +52,11 @@
 class DronecanHandle
 {
 public:
-	/// Default pool budget (DESIGN Q5: AP's non-FD default). At a 40 B block this is
-	/// ~204 blocks. The static storage is sized to this; DC_POOL/DC_POOL_MAX wiring
-	/// (a runtime bound on a larger buffer) lands with the node params in P4.3.
-	static constexpr uint32_t PoolStorageBytes = 8192;
+	/// DC_POOL_MAX: the static pool ceiling. The live pool handed to canardInit is the
+	/// runtime DC_POOL bound (default 8192, ~204 blocks at 40 B), clamped to this; sizing
+	/// the static buffer larger lets a high-node-count bus grow DC_POOL without a recompile
+	/// (DESIGN Q5/§3). The node passes DC_POOL into init(); the default is the full ceiling.
+	static constexpr uint32_t PoolStorageBytes = 16384;
 
 	DronecanHandle(CanardInterface &iface, DronecanRxRouter &router);
 
