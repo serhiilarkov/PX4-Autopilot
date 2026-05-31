@@ -104,6 +104,14 @@ px4_add_module(
 	SRCS
 		DronecanNode.cpp
 		DronecanNode.hpp
+		CanardInterface.hpp
+		DroneCANCodec.cpp
+		DroneCANCodec.hpp
+		DronecanRxRouter.cpp
+		DronecanRxRouter.hpp
+		DronecanHandle.cpp
+		DronecanHandle.hpp
+		RxSubscriberBase.hpp
 		${DRONECAN_LIBCANARD_DIR}/canard.c
 		${DRONECAN_LIBCANARD_DIR}/canard.h
 		${DRONECAN_GENERATED_SRCS}
