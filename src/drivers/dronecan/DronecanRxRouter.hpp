@@ -81,8 +81,9 @@ public:
 	bool accept(uint16_t data_type_id, CanardTransferType transfer_type, uint64_t *out_signature) const;
 
 	/// onReception path: deliver the transfer. Broadcast -> every matching handler;
-	/// service (request/response) -> the first matching handler only.
-	void dispatch(const CanardRxTransfer &transfer) const;
+	/// service (request/response) -> the first matching handler only. iface_id is the
+	/// CAN interface the transfer arrived on, forwarded to each handler.
+	void dispatch(const CanardRxTransfer &transfer, uint8_t iface_id) const;
 
 private:
 	RxHandler *_buckets[DC_RX_BUCKETS] {};

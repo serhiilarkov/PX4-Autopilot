@@ -180,8 +180,9 @@ void test_wrong_length_rejected()
 class CapturingSubscriber : public RxSubscriberBase
 {
 public:
-	void handle(const CanardRxTransfer &transfer) override
+	void handle(const CanardRxTransfer &transfer, uint8_t iface_id) override
 	{
+		(void)iface_id;
 		_calls++;
 		_decode_ok = dronecan_codec::decodeTransfer(transfer, &_last, nodestatus_decode);
 	}

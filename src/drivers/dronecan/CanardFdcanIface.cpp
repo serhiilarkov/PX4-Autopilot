@@ -48,9 +48,11 @@ int CanardFdcanIface::init(uint32_t bitrate)
 		return -1;
 	}
 
-	_iface = _can.driver.getIface(0);
+	// CanInitHelper::init brings up every configured interface; record how many so
+	// receive()/transmit() can fan out across CAN1, CAN2, ...
+	_num_ifaces = _can.driver.getNumIfaces();
 
-	return (_iface != nullptr) ? 0 : -1;
+	return (_num_ifaces > 0) ? 0 : -1;
 }
 
 void CanardFdcanIface::registerBusEventCallback(void (*handler)())
@@ -62,7 +64,7 @@ int16_t CanardFdcanIface::transmit(const CanardCANFrame &frame, int timeout_ms)
 {
 	(void)timeout_ms;
 
-	if (_iface == nullptr) {
+	if (_num_ifaces == 0) {
 		return -1;
 	}
 
@@ -89,41 +91,90 @@ int16_t CanardFdcanIface::transmit(const CanardCANFrame &frame, int timeout_ms)
 	const px4can::MonotonicTime deadline =
 		uavcan_stm32h7::clock::getMonotonic() + px4can::MonotonicDuration::fromUSec(remaining_usec);
 
-	// 1 = enqueued, 0 = no TX mailbox free (retry next pump), <0 = error.
-	return _iface->send(out_frame, deadline, 0);
+	// Broadcast on every interface so the node is heard on all buses (CAN1, CAN2, ...).
+	// The primary (iface 0) gates the result so DronecanHandle::transmit() only pops the
+	// frame when it is accepted there -- a busy primary retries the whole frame next pump
+	// without having re-sent on the secondaries (no duplicates). Secondaries are
+	// best-effort: a momentarily-full secondary mailbox drops that one frame on that bus.
+	px4can::ICanIface *primary = _can.driver.getIface(0);
+
+	if (primary == nullptr) {
+		return -1;
+	}
+
+	const int16_t res0 = primary->send(out_frame, deadline, 0);
+
+	if (res0 <= 0) {
+		// 0 = no TX mailbox free (retry next pump), <0 = error.
+		return res0;
+	}
+
+	for (uint8_t i = 1; i < _num_ifaces; i++) {
+		px4can::ICanIface *iface = _can.driver.getIface(i);
+
+		if (iface != nullptr) {
+			(void)iface->send(out_frame, deadline, 0);
+		}
+	}
+
+	return res0;
 }
 
 int16_t CanardFdcanIface::receive(DronecanRxFrame *rxf)
 {
-	if (_iface == nullptr || rxf == nullptr) {
+	if (_num_ifaces == 0 || rxf == nullptr) {
 		return -1;
 	}
 
-	px4can::CanFrame in_frame;
-	px4can::MonotonicTime ts_monotonic;
-	px4can::UtcTime ts_utc;
-	px4can::CanIOFlags flags = 0;
+	// Round-robin one frame per call across all interfaces; the cursor persists so no
+	// interface starves another across pump cycles.
+	for (uint8_t n = 0; n < _num_ifaces; n++) {
+		const uint8_t i = _rx_cursor;
+		_rx_cursor = (uint8_t)((_rx_cursor + 1) % _num_ifaces);
 
-	const int16_t res = _iface->receive(in_frame, ts_monotonic, ts_utc, flags);
+		px4can::ICanIface *iface = _can.driver.getIface(i);
 
-	if (res <= 0) {
-		// 0 == RX queue empty, <0 == error.
-		return res;
+		if (iface == nullptr) {
+			continue;
+		}
+
+		px4can::CanFrame in_frame;
+		px4can::MonotonicTime ts_monotonic;
+		px4can::UtcTime ts_utc;
+		px4can::CanIOFlags flags = 0;
+
+		const int16_t res = iface->receive(in_frame, ts_monotonic, ts_utc, flags);
+
+		if (res < 0) {
+			return res;
+		}
+
+		if (res == 0) {
+			continue; // this interface empty, try the next
+		}
+
+		// Zero-init: canard.c reads frame.iface_id (and, with DEADLINE, deadline_usec)
+		// during reassembly, so every field must be deterministic.
+		rxf->frame = CanardCANFrame{};
+		rxf->frame.id = in_frame.id | CANARD_CAN_FRAME_EFF;
+
+		uint8_t dlc = in_frame.dlc;
+
+		if (dlc > CANARD_CAN_FRAME_MAX_DATA_LEN) {
+			dlc = CANARD_CAN_FRAME_MAX_DATA_LEN;
+		}
+
+		rxf->frame.data_len = dlc;
+		memcpy(rxf->frame.data, in_frame.data, dlc);
+
+		// The interface the frame arrived on (0 = CAN1, 1 = CAN2, ...).
+		rxf->frame.iface_id = i;
+
+		// Stamp in the canard timebase (hrt) -- the node runs cleanupStale() on hrt.
+		rxf->timestamp_usec = hrt_absolute_time();
+
+		return 1;
 	}
 
-	rxf->frame.id = in_frame.id | CANARD_CAN_FRAME_EFF;
-
-	uint8_t dlc = in_frame.dlc;
-
-	if (dlc > CANARD_CAN_FRAME_MAX_DATA_LEN) {
-		dlc = CANARD_CAN_FRAME_MAX_DATA_LEN;
-	}
-
-	rxf->frame.data_len = dlc;
-	memcpy(rxf->frame.data, in_frame.data, dlc);
-
-	// Stamp in the canard timebase (hrt) -- the node runs cleanupStale() on hrt.
-	rxf->timestamp_usec = hrt_absolute_time();
-
-	return res;
+	return 0; // all interfaces empty
 }

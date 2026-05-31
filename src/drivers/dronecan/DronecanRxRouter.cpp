@@ -61,7 +61,7 @@ bool DronecanRxRouter::accept(uint16_t data_type_id, CanardTransferType transfer
 	return false;
 }
 
-void DronecanRxRouter::dispatch(const CanardRxTransfer &transfer) const
+void DronecanRxRouter::dispatch(const CanardRxTransfer &transfer, uint8_t iface_id) const
 {
 	const uint8_t bucket = transfer.data_type_id % DC_RX_BUCKETS;
 	const bool is_service = (transfer.transfer_type != CanardTransferTypeBroadcast);
@@ -70,7 +70,7 @@ void DronecanRxRouter::dispatch(const CanardRxTransfer &transfer) const
 		if (h->data_type_id == transfer.data_type_id
 		    && static_cast<uint8_t>(h->transfer_type) == transfer.transfer_type) {
 
-			h->subscriber->handle(transfer);
+			h->subscriber->handle(transfer, iface_id);
 
 			// Broadcast delivers to every matching handler; a service transfer is
 			// consumed by the first matching handler only.

@@ -53,10 +53,14 @@ void DronecanHandle::init(uint32_t pool_bytes)
 
 void DronecanHandle::receive()
 {
-	DronecanRxFrame rxf;
+	// Zero-init: canard.c reads frame.iface_id for its multi-frame reassembly
+	// (same_iface / iface-switch logic), so an uninitialized iface_id would corrupt it.
+	DronecanRxFrame rxf {};
 
-	// Push model: hand each frame to libcanard, which fires onReception inline.
+	// Push model: hand each frame to libcanard, which fires onReception inline. Capture
+	// the frame's iface for the trampoline before the (synchronous) handle call.
 	while (_iface.receive(&rxf) > 0) {
+		_rx_iface = rxf.frame.iface_id;
 		canardHandleRxFrame(&_canard, &rxf.frame, rxf.timestamp_usec);
 	}
 }
@@ -153,5 +157,5 @@ void DronecanHandle::trampolineOnReception(CanardInstance *ins, CanardRxTransfer
 		return;
 	}
 
-	self->_router.dispatch(*transfer);
+	self->_router.dispatch(*transfer, self->_rx_iface);
 }

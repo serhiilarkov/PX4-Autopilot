@@ -106,6 +106,13 @@ private:
 
 	CanardInstance _canard {};
 
+	// iface_id of the frame currently being fed to canardHandleRxFrame. The push model
+	// is synchronous -- onReception fires inside that call on the same WQ thread -- so
+	// this is the arriving transfer's interface when trampolineOnReception reads it.
+	// canard.c drops frames whose iface differs mid-transfer, so a completed multi-frame
+	// transfer has a single well-defined iface (the last frame's).
+	uint8_t _rx_iface {0};
+
 	// Word-aligned static pool storage, a per-instance member (matches AP's uint32_t[]
 	// arena, not a static-global). The single arena canardInit slices into 40 B blocks
 	// shared by RX reassembly and TX enqueue.

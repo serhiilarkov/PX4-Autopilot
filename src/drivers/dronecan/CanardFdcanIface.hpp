@@ -48,6 +48,12 @@
  * libuavcan dependency). Converts between the v0 CanardCANFrame and px4can::CanFrame
  * (identical layout) and routes the driver's CAN-RX-IRQ BusEvent to the node's
  * ScheduleNow() trampoline.
+ *
+ * Multi-interface: the driver exposes getNumIfaces() interfaces (CAN1, CAN2, ...).
+ * receive() round-robins across them and tags each frame with its source iface_id so
+ * the bridges can encode the bus into the uORB device id; transmit() broadcasts on the
+ * primary then best-effort on the secondaries. The iface count is set by the build
+ * (UAVCAN_STM32H7_NUM_IFACES); on-bus dual-interface operation awaits HW validation.
  */
 class CanardFdcanIface : public CanardInterface
 {
@@ -71,5 +77,6 @@ private:
 	static constexpr unsigned RxQueueLenPerIface = 64;
 
 	uavcan_stm32h7::CanInitHelper<RxQueueLenPerIface> _can;
-	px4can::ICanIface *_iface{nullptr};
+	uint8_t _num_ifaces{0};
+	uint8_t _rx_cursor{0};   // round-robin RX so no interface starves the others
 };

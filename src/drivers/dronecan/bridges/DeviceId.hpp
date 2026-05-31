@@ -33,75 +33,33 @@
 
 #pragma once
 
-#include "../CanardInterface.hpp"
+#include <stdint.h>
+
+namespace dronecan_bridge
+{
+
+/// device::Device::DeviceBusType_UAVCAN. Hard-coded so this header stays
+/// platform-free (host-testable) -- the value is frozen by the device-id wire/log
+/// format, identical to device::Device.
+static constexpr uint8_t DeviceBusType_UAVCAN = 3;
 
 /**
- * Off-target media backend for the contract tests. Captures transmitted frames
- * and serves queued frames back, with a loopback helper so an encoded transfer
- * can be fed straight back into the RX path -- exercising the full
- * encode -> TX queue -> media -> RX -> reassembly -> dispatch -> decode stack
- * with no hardware.
+ * Pack a PX4 device id for a DroneCAN node, byte-identical to
+ * UavcanSensorBridgeBase::make_uavcan_device_id (REF sensor_bridge.hpp:161-169) and
+ * to device::Device::DeviceId's little-endian bitfield layout:
+ *   bits[0:2]   = bus_type (UAVCAN = 3)
+ *   bits[3:7]   = bus      (iface_index: 0 = CAN1, 1 = CAN2)
+ *   bits[8:15]  = address  (node_id)
+ *   bits[16:23] = devtype  (sensor-class device type, e.g. 0x85 GPS)
+ *
+ * Example (ACCEPTANCE_SPEC §2): node 125 on CAN1, devtype 0x85 -> 0x00857D03.
  */
-class FakeCanardInterface : public CanardInterface
+inline uint32_t make_uavcan_device_id(uint8_t node_id, uint8_t iface_index, uint8_t devtype)
 {
-public:
-	static constexpr uint32_t MaxFrames = 64;
+	return (uint32_t)(DeviceBusType_UAVCAN & 0x7)
+	       | ((uint32_t)(iface_index & 0x1F) << 3)
+	       | ((uint32_t)node_id << 8)
+	       | ((uint32_t)devtype << 16);
+}
 
-	int16_t transmit(const CanardCANFrame &frame, int timeout_ms = 0) override
-	{
-		(void)timeout_ms;
-
-		if (_tx_count < MaxFrames) {
-			_tx[_tx_count++] = frame;
-			return 1;
-		}
-
-		return -1;
-	}
-
-	int16_t receive(DronecanRxFrame *rxf) override
-	{
-		if (rxf == nullptr) {
-			return -1;
-		}
-
-		if (_rx_head < _rx_count) {
-			*rxf = _rx[_rx_head++];
-			return 1;
-		}
-
-		return 0;
-	}
-
-	/// Move all captured TX frames into the RX queue (stamped ts), as if the bus
-	/// echoed them back, then clear the TX capture. iface_id tags the frames with the
-	/// interface they "arrived" on (0 = CAN1, 1 = CAN2), exercising the iface plumbing.
-	void loopbackTxToRx(uint64_t ts, uint8_t iface_id = 0)
-	{
-		for (uint32_t i = 0; i < _tx_count && _rx_count < MaxFrames; i++) {
-			_rx[_rx_count].timestamp_usec = ts;
-			_rx[_rx_count].frame = _tx[i];
-			_rx[_rx_count].frame.iface_id = iface_id;
-			_rx_count++;
-		}
-
-		_tx_count = 0;
-	}
-
-	uint32_t txCount() const { return _tx_count; }
-	const CanardCANFrame &txFrame(uint32_t i) const { return _tx[i]; }
-
-	void clear()
-	{
-		_tx_count = 0;
-		_rx_count = 0;
-		_rx_head = 0;
-	}
-
-private:
-	CanardCANFrame  _tx[MaxFrames] {};
-	DronecanRxFrame _rx[MaxFrames] {};
-	uint32_t _tx_count {0};
-	uint32_t _rx_count {0};
-	uint32_t _rx_head {0};
-};
+} // namespace dronecan_bridge

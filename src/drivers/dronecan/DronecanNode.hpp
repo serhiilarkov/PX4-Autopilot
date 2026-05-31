@@ -47,6 +47,8 @@
 #include "DronecanHandle.hpp"
 #include "DronecanRxRouter.hpp"
 
+class Gnss;
+
 #if defined(DRONECAN_FDCAN_DRIVER)
 # include "CanardFdcanIface.hpp"
 #elif defined(CONFIG_NET_CAN)
@@ -125,6 +127,10 @@ private:
 	NullCanardInterface _can_iface;
 #endif
 	DronecanHandle _handle {_can_iface, _rx_router};
+
+	// Sensor bridges. Heap-allocated in the lazy init() (gated by their DC_SUB_*),
+	// registered with _rx_router; deleted in the dtor before _handle/_rx_router go.
+	Gnss *_gnss{nullptr};
 
 	// NodeStatus @ 1 Hz.
 	hrt_abstime _boot_time{0};

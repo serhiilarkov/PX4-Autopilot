@@ -49,5 +49,8 @@ public:
 
 	/// Called by the router for each accepted transfer matching a registered type.
 	/// The transfer and all its pointers are valid only for the duration of the call.
-	virtual void handle(const CanardRxTransfer &transfer) = 0;
+	/// iface_id is the CAN interface the transfer arrived on (0 = CAN1, 1 = CAN2);
+	/// bridges encode it into the uORB device id's bus field. Classic libcanard does
+	/// not carry the iface in CanardRxTransfer, so the handle threads it in alongside.
+	virtual void handle(const CanardRxTransfer &transfer, uint8_t iface_id) = 0;
 };

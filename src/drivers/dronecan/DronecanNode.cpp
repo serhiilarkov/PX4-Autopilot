@@ -33,6 +33,7 @@
 
 #include "DronecanNode.hpp"
 #include "DroneCANCodec.hpp"
+#include "bridges/Gnss.hpp"
 
 #include <lib/parameters/param.h>
 
@@ -87,6 +88,10 @@ DronecanNode::DronecanNode(uint32_t node_id, uint32_t bitrate) :
 DronecanNode::~DronecanNode()
 {
 	ScheduleClear();
+
+	// Delete bridges before _handle/_rx_router (which they reference) are destroyed.
+	delete _gnss;
+	_gnss = nullptr;
 
 	perf_free(_cycle_perf);
 	perf_free(_interval_perf);
@@ -147,6 +152,19 @@ bool DronecanNode::init()
 	// Node id was validated isUnicast in start(); PX4 is the DroneCAN server, never an
 	// anonymous DNA client, so no TX is issued before the id is set.
 	_handle.setNodeID((uint8_t)_node_id);
+
+	// Sensor bridges: construct + register RX handlers before the first receive().
+	// Gated by DC_SUB_GPS (default 1), mirroring libuavcan's make_all gate.
+	int32_t sub_gps = 1;
+	param_get(param_find("DC_SUB_GPS"), &sub_gps);
+
+	if (sub_gps != 0) {
+		_gnss = new Gnss(_handle);
+
+		if (_gnss != nullptr) {
+			_gnss->init(_rx_router);
+		}
+	}
 
 	_boot_time = hrt_absolute_time();
 	_initialized = true;
@@ -220,9 +238,15 @@ void DronecanNode::Run()
 	sendNodeStatus();
 
 	// transmit(); receive(); transmit(); -- the trailing transmit flushes service
-	// responses that receive()'s onReception callbacks enqueue this same tick (DESIGN §6).
+	// responses that receive()'s onReception callbacks enqueue this same tick (DESIGN §6),
+	// plus the bridges' outgoing traffic (GNSS RTCM/MovingBaselineData uplink).
 	_handle.transmit();
 	_handle.receive();
+
+	if (_gnss != nullptr) {
+		_gnss->update();
+	}
+
 	_handle.transmit();
 
 	// Stale-transfer cleanup, once per pass.
@@ -254,9 +278,13 @@ void DronecanNode::migrateLegacyParams()
 		const char *legacy;
 		const char *current;
 	} table[] = {
-		{"UAVCAN_ENABLE",  "DC_ENABLE"},
-		{"UAVCAN_NODE_ID", "DC_NODE_ID"},
-		{"UAVCAN_BITRATE", "DC_BITRATE"},
+		{"UAVCAN_ENABLE",   "DC_ENABLE"},
+		{"UAVCAN_NODE_ID",  "DC_NODE_ID"},
+		{"UAVCAN_BITRATE",  "DC_BITRATE"},
+		{"UAVCAN_SUB_GPS",  "DC_SUB_GPS"},
+		{"UAVCAN_PUB_RTCM", "DC_PUB_RTCM"},
+		{"UAVCAN_PUB_MBD",  "DC_PUB_MBD"},
+		{"UAVCAN_SUB_MBD",  "DC_SUB_MBD"},
 	};
 
 	for (const auto &pair : table) {
@@ -298,6 +326,10 @@ void DronecanNode::print_info()
 		PX4_INFO("pool: %u/%u blocks (peak %u), exhausted count %" PRIu32,
 			 st.current_usage_blocks, st.capacity_blocks, st.peak_usage_blocks,
 			 _handle.poolExhaustedCount());
+	}
+
+	if (_gnss != nullptr) {
+		_gnss->print_status();
 	}
 
 	perf_print_counter(_cycle_perf);

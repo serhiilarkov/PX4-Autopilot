@@ -109,6 +109,10 @@ if(${PX4_PLATFORM} MATCHES "nuttx" AND "${CONFIG_ARCH_CHIP}" MATCHES "stm32h7" A
 	)
 	list(APPEND DRONECAN_MEDIA_FLAGS
 		-DDRONECAN_FDCAN_DRIVER=1
+		# ark_fmu-v6x routes both CAN1 and CAN2 to transceivers (board_get_can_interfaces
+		# == 0x3); run both, matching the legacy uavcan driver. The media fans RX/TX across
+		# getNumIfaces() and tags each frame's source interface into the device id.
+		-DUAVCAN_STM32H7_NUM_IFACES=2
 	)
 	# The extracted libuavcan-derived register driver predates PX4's C++ warning set.
 	set_source_files_properties(
@@ -161,6 +165,13 @@ px4_add_module(
 		DronecanHandle.cpp
 		DronecanHandle.hpp
 		RxSubscriberBase.hpp
+		bridges/DeviceId.hpp
+		bridges/SensorBridgeBase.cpp
+		bridges/SensorBridgeBase.hpp
+		bridges/GnssDecode.cpp
+		bridges/GnssDecode.hpp
+		bridges/Gnss.cpp
+		bridges/Gnss.hpp
 		${DRONECAN_MEDIA_SRCS}
 		${DRONECAN_LIBCANARD_DIR}/canard.c
 		${DRONECAN_LIBCANARD_DIR}/canard.h

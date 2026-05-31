@@ -41,6 +41,42 @@ parameters:
       min: 20000
       max: 1000000
       reboot_required: true
+    DC_SUB_GPS:
+      description:
+        short: DroneCAN GPS subscription
+        long: |-
+          Subscribe to DroneCAN GNSS (Fix/Fix2/Auxiliary + RelPosHeading) and publish
+          sensor_gps. Migrated from UAVCAN_SUB_GPS.
+      type: boolean
+      default: 1
+      reboot_required: true
+    DC_PUB_RTCM:
+      description:
+        short: DroneCAN RTCM stream publication
+        long: |-
+          Forward GCS RTCM corrections (gps_inject_data) onto the bus as
+          uavcan.equipment.gnss.RTCMStream. Migrated from UAVCAN_PUB_RTCM.
+      type: boolean
+      default: 0
+      reboot_required: true
+    DC_PUB_MBD:
+      description:
+        short: DroneCAN MovingBaselineData publication
+        long: |-
+          Forward GCS corrections onto the bus as ardupilot.gnss.MovingBaselineData
+          (moving-baseline RTK). Migrated from UAVCAN_PUB_MBD.
+      type: boolean
+      default: 0
+      reboot_required: true
+    DC_SUB_MBD:
+      description:
+        short: DroneCAN MovingBaselineData subscription
+        long: |-
+          Subscribe to incoming ardupilot.gnss.MovingBaselineData and forward it to
+          gps_dump for PPK logging. Migrated from UAVCAN_SUB_MBD.
+      type: boolean
+      default: 0
+      reboot_required: true
     DC_POOL:
       description:
         short: DroneCAN memory pool size
