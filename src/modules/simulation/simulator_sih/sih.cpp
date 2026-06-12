@@ -351,11 +351,17 @@ uint8_t Sih::num_motors() const
 {
 	switch (_vehicle) {
 	case VehicleType::Quadcopter:     return 4;
+
 	case VehicleType::Hexacopter:     return 6;
+
 	case VehicleType::TailsitterVTOL: return NUM_DYN_THRUSTER; // motors at index 0..1, surfaces at 4..5
+
 	case VehicleType::StandardVTOL:   return 4;                // hover motors at 0..3; pusher at 7 excluded for simplicity
+
 	case VehicleType::FixedWing:      return 1;                // motor at index 3, surfaces at 0..2 are skipped
+
 	case VehicleType::RoverAckermann: return 1;
+
 	default:                          return 0;
 	}
 }

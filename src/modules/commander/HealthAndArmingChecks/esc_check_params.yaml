@@ -55,7 +55,8 @@ parameters:
       description:
         short: ESC over-temperature warning threshold
         long: |-
-          Warning raised if ESC temperature gets above threshold: no failsafe action triggered or arming prevented.
+          If ESC temperature exceeds this threshold there's a warning and arming is prevented.
+          Requires ESC telemetry checks COM_ARM_CHK_ESCS to be enabled.
           Set to -1 to disable the check.
       type: float
       default: 90.0

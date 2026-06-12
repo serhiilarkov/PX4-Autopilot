@@ -82,6 +82,10 @@ void EscChecks::checkAndReport(const Context &context, Report &reporter)
 		uint16_t mask = 0;
 
 		if (_param_com_arm_chk_escs.get() > 0) {
+			if (_param_com_esc_ot_warn.get() >= FLT_EPSILON) {
+				checkEscTemperature(esc_status);
+			}
+
 			mask |= checkEscOnline(context, reporter, esc_status, now);
 			mask |= checkEscStatus(context, reporter, esc_status);
 		}
@@ -89,10 +93,6 @@ void EscChecks::checkAndReport(const Context &context, Report &reporter)
 		if (_param_fd_act_en.get() > 0) {
 			updateEscsStatus(context, reporter, esc_status, now);
 			mask |= checkMotorStatus(context, reporter, esc_status, now);
-		}
-
-		if (_param_com_esc_ot_warn.get() >= FLT_EPSILON) {
-			checkEscTemperature(reporter, esc_status);
 		}
 
 		_motor_failure_mask = mask;
@@ -218,12 +218,9 @@ uint16_t EscChecks::checkEscStatus(const Context &context, Report &reporter, con
 	return mask;
 }
 
-void EscChecks::checkEscTemperature(Report &reporter, const esc_status_s &esc_status)
+void EscChecks::checkEscTemperature(esc_status_s &esc_status)
 {
-	const float warn_temp = _param_com_esc_ot_warn.get();
-
-	int hottest_esc_index = -1;
-	float max_temperature = -FLT_MAX;
+	const float temperature_threshold = _param_com_esc_ot_warn.get();
 
 	for (int esc_index = 0; esc_index < esc_status_s::CONNECTED_ESC_MAX; esc_index++) {
 		if (!math::isInRange(esc_status.esc[esc_index].actuator_function,
@@ -233,43 +230,9 @@ void EscChecks::checkEscTemperature(Report &reporter, const esc_status_s &esc_st
 
 		const float temperature = esc_status.esc[esc_index].esc_temperature;
 
-		if (!PX4_ISFINITE(temperature)) {
-			continue;
+		if (PX4_ISFINITE(temperature) && temperature > temperature_threshold) {
+			esc_status.esc[esc_index].failures |= (1 << static_cast<uint8_t>(esc_fault_reason_t::esc_warn_temp));
 		}
-
-		if (temperature > max_temperature) {
-			max_temperature = temperature;
-			hottest_esc_index = esc_index;
-		}
-
-		if (temperature > warn_temp) {
-			/* EVENT
-			* @description
-			* <profile name="dev">
-			* This check can be configured via <param>COM_ESC_OT_WARN</param> parameter.
-			* </profile>
-			*/
-			reporter.healthFailure<uint8_t, uint8_t>(NavModes::None, health_component_t::motors_escs,
-					events::ID("check_esc_over_temperature"),
-					events::Log::Warning,
-					"ESC {1} temperature warning, {2:C}",
-					static_cast<uint8_t>(esc_index + 1), static_cast<uint8_t>(temperature));
-		}
-	}
-
-	if (hottest_esc_index < 0) {
-		return;
-	}
-
-	if (max_temperature > warn_temp) {
-		if (!_esc_over_temp_warned && reporter.mavlink_log_pub()) {
-			mavlink_log_warning(reporter.mavlink_log_pub(),
-					    "High ESC temperature. Reduce throttle!");
-			_esc_over_temp_warned = true;
-		}
-
-	} else if (max_temperature < warn_temp - ESC_OVER_TEMP_RESET_MARGIN) {
-		_esc_over_temp_warned = false;
 	}
 }
 
