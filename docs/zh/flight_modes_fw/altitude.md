@@ -47,7 +47,7 @@ Airspeed is also stabilized if an airspeed sensor is present.
 
 该模式受以下参数影响：
 
-| 参数                                                                                                                                                                                        | 描述                                                                                      |
+| Parameter                                                                                                                                                                                 | 描述                                                                                      |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | <a id="FW_AIRSPD_MIN"></a>[FW_AIRSPD_MIN](../advanced_config/parameter_reference.md#FW_AIRSPD_MIN)                                              | 最小空速/油门。 默认：10 m/s。                                                                     |
 | <a id="FW_AIRSPD_MAX"></a>[FW_AIRSPD_MAX](../advanced_config/parameter_reference.md#FW_AIRSPD_MAX)                                              | 最大空速/油门。 默认：20 m/s。                                                                     |
