@@ -141,7 +141,7 @@ The calibration process:
    commander calibrate mag quick [heading]
    ```
 
-   | Параметр                                | Опис                                                                                                                                                     |
+   | Parameter                               | Опис                                                                                                                                                     |
    | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
    | `heading` (optional) | True heading of the vehicle in degrees (0–359). Defaults to 0° (North) if omitted. |
 
