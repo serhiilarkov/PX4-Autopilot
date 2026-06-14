@@ -41,7 +41,7 @@ Airspeed is also stabilized if an airspeed sensor is present.
 
 The mode is affected by the following parameters:
 
-| 매개변수                                                                                                                                                                                            | 설명                                                                                                                   |
+| Parameter                                                                                                                                                                                       | 설명                                                                                                                   |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | <a id="FW_AIRSPD_MIN"></a>[FW_AIRSPD_MIN](../advanced_config/parameter_reference.md#FW_AIRSPD_MIN)                                                    | Min airspeed. Default: 10 m/s.                                       |
 | <a id="FW_AIRSPD_MAX"></a>[FW_AIRSPD_MAX](../advanced_config/parameter_reference.md#FW_AIRSPD_MAX)                                                    | Max airspeed. Default: 20 m/s.                                       |

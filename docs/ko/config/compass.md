@@ -141,7 +141,7 @@ The calibration process:
    commander calibrate mag quick [heading]
    ```
 
-   | 매개변수                                    | 설명                                                                                                                                                       |
+   | Parameter                               | 설명                                                                                                                                                       |
    | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
    | `heading` (optional) | True heading of the vehicle in degrees (0–359). Defaults to 0° (North) if omitted. |
 
